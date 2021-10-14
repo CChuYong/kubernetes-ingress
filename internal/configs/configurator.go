@@ -1287,21 +1287,65 @@ func (cnf *Configurator) updateApResources(ingEx *IngressEx) *appProtectResource
 	return &apResources
 }
 
+func getDosProtectedStringValue(obj *unstructured.Unstructured, fields ...string) string {
+	val, has, err := unstructured.NestedString(obj.Object, fields...)
+	if err != nil {
+		glog.Warningf("failed to get value from DosProtectedResource: %v, %v", fields, err)
+	}
+	if !has {
+		glog.Warningf("missing value from DosProtectedResource: %v, %v", fields, err)
+	}
+	return val
+}
+
+func getDosProtectedBoolValue(obj *unstructured.Unstructured, fields ...string) bool {
+	val, has, err := unstructured.NestedBool(obj.Object, fields...)
+	if err != nil {
+		glog.Warningf("failed to get value from DosProtectedResource: %v, %v", fields, err)
+	}
+	if !has {
+		glog.Warningf("missing value from DosProtectedResource: %v, %v", fields, err)
+	}
+	return val
+}
+
 func (cnf *Configurator) updateApDosResources(ingEx *IngressEx) *appProtectDosResources {
 	var dosResources appProtectDosResources
+	if ingEx.AppProtectDosResourceEx != nil {
+		if ingEx.AppProtectDosResourceEx.DosProtected != nil {
 
-	if ingEx.AppProtectDosPolicy != nil {
-		policyFileName := appProtectDosPolicyFileNameFromUnstruct(ingEx.AppProtectDosPolicy)
-		policyContent := generateApResourceFileContent(ingEx.AppProtectDosPolicy)
-		cnf.nginxManager.CreateAppProtectResourceFile(policyFileName, policyContent)
-		dosResources.AppProtectDosPolicy = policyFileName
-	}
+			protected := ingEx.AppProtectDosResourceEx.DosProtected
+			dosResources.AppProtectDosEnable = "off"
+			if getDosProtectedBoolValue(protected, "spec", "enable") {
+				dosResources.AppProtectDosEnable = "on"
+			}
+			dosResources.AppProtectDosName = getDosProtectedStringValue(protected, "spec", "name")
+			dosResources.AppProtectDosMonitor = getDosProtectedStringValue(protected, "spec", "apDosMonitor")
+			dosResources.AppProtectDosAccessLogDst = getDosProtectedStringValue(protected, "spec", "dosAccessLogDest")
 
-	if ingEx.AppProtectDosLogConf != nil {
-		logConfFileName := appProtectDosLogConfFileNameFromUnstruct(ingEx.AppProtectDosLogConf)
-		logConfContent := generateApResourceFileContent(ingEx.AppProtectDosLogConf)
-		cnf.nginxManager.CreateAppProtectResourceFile(logConfFileName, logConfContent)
-		dosResources.AppProtectDosLogconfs = logConfFileName + " " + generateDosLogDest(ingEx.AppProtectDosLogDst)
+			if ingEx.AppProtectDosResourceEx.DosPolicy != nil {
+				pol := ingEx.AppProtectDosResourceEx.DosPolicy
+				policyFileName := appProtectDosPolicyFileNameFromUnstruct(pol)
+				policyContent := generateApResourceFileContent(pol)
+				cnf.nginxManager.CreateAppProtectResourceFile(policyFileName, policyContent)
+				dosResources.AppProtectDosPolicyFile = policyFileName
+			}
+
+			if ingEx.AppProtectDosResourceEx.DosLogConf != nil {
+				log := ingEx.AppProtectDosResourceEx.DosLogConf
+				logConfFileName := appProtectDosLogConfFileNameFromUnstruct(log)
+				logConfContent := generateApResourceFileContent(log)
+				cnf.nginxManager.CreateAppProtectResourceFile(logConfFileName, logConfContent)
+				logDest := getDosProtectedStringValue(protected, "spec", "dosSecurityLog", "dosLogDest")
+				dosResources.AppProtectDosLogConfFile = logConfFileName + " " + generateDosLogDest(logDest)
+				enabled := getDosProtectedBoolValue(protected, "spec", "dosSecurityLog", "enable")
+				if enabled {
+					dosResources.AppProtectDosLogEnable = "on"
+				} else {
+					dosResources.AppProtectDosLogEnable = "off"
+				}
+			}
+		}
 	}
 
 	return &dosResources
@@ -1372,6 +1416,8 @@ func generateApResourceFileContent(apResource *unstructured.Unstructured) []byte
 	data, _ := json.Marshal(spec)
 	return data
 }
+
+type ResourceOperation func(resource *unstructured.Unstructured, ingExes []*IngressEx, mergeableIngresses []*MergeableIngresses, vsExes []*VirtualServerEx) (Warnings, error)
 
 // AddOrUpdateAppProtectResource updates Ingresses and VirtualServers that use App Protect or App Protect DoS resources.
 func (cnf *Configurator) AddOrUpdateAppProtectResource(resource *unstructured.Unstructured, ingExes []*IngressEx, mergeableIngresses []*MergeableIngresses, vsExes []*VirtualServerEx) (Warnings, error) {

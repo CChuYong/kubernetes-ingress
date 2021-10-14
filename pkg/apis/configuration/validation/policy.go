@@ -99,22 +99,22 @@ func validatePolicySpec(spec *v1.PolicySpec, fieldPath *field.Path, isPlus, enab
 		fieldCount++
 	}
 
-	if spec.Dos != nil {
-		if !enablePreviewPolicies {
-			allErrs = append(allErrs, field.Forbidden(fieldPath.Child("dos"),
-				"dos is a preview policy. Preview policies must be enabled to use via cli argument -enable-preview-policies"))
-		}
-		if !isPlus {
-			allErrs = append(allErrs, field.Forbidden(fieldPath.Child("dos"), "dos is only supported in NGINX Plus"))
-		}
-		if !enableAppProtectDos {
-			allErrs = append(allErrs, field.Forbidden(fieldPath.Child("dos"),
-				"App Protect dos must be enabled via cli argument -enable-appprotect-dos to use dos policy"))
-		}
-
-		allErrs = append(allErrs, validateDos(spec.Dos, fieldPath.Child("dos"))...)
-		fieldCount++
-	}
+	//if spec.Dos != nil {
+	//	if !enablePreviewPolicies {
+	//		allErrs = append(allErrs, field.Forbidden(fieldPath.Child("dos"),
+	//			"dos is a preview policy. Preview policies must be enabled to use via cli argument -enable-preview-policies"))
+	//	}
+	//	if !isPlus {
+	//		allErrs = append(allErrs, field.Forbidden(fieldPath.Child("dos"), "dos is only supported in NGINX Plus"))
+	//	}
+	//	if !enableAppProtectDos {
+	//		allErrs = append(allErrs, field.Forbidden(fieldPath.Child("dos"),
+	//			"App Protect dos must be enabled via cli argument -enable-appprotect-dos to use dos policy"))
+	//	}
+	//
+	//	allErrs = append(allErrs, validateDos(spec.Dos, fieldPath.Child("dos"))...)
+	//	fieldCount++
+	//}
 
 	if fieldCount != 1 {
 		msg := "must specify exactly one of: `accessControl`, `rateLimit`, `ingressMTLS`, `egressMTLS`"
@@ -300,39 +300,39 @@ func validateLogConf(logConf, logDest string, fieldPath *field.Path) field.Error
 	return allErrs
 }
 
-func validateDos(dos *v1.Dos, fieldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if dos.ApDosPolicy != "" {
-		for _, msg := range validation.IsQualifiedName(dos.ApDosPolicy) {
-			allErrs = append(allErrs, field.Invalid(fieldPath.Child("apDosPolicy"), dos.ApDosPolicy, msg))
-		}
-	}
-
-	if dos.Name != "" {
-		err := ValidateAppProtectDosName(dos.Name)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fieldPath.Child("Name"), dos.Name, err.Error()))
-		}
-	}
-
-	if dos.ApDosMonitor != "" {
-		err := ValidateAppProtectDosMonitor(dos.ApDosMonitor)
-		if err != nil {
-			allErrs = append(allErrs, field.Invalid(fieldPath.Child("ApDosMonitor"), dos.ApDosMonitor, err.Error()))
-		}
-	}
-
-	if dos.DosAccessLogDest != "" {
-		allErrs = append(allErrs, validateDosLogAccessLogDest(dos.DosAccessLogDest, fieldPath.Child("dosAccessLogDest"))...)
-	}
-
-	if dos.DosSecurityLog != nil {
-		allErrs = append(allErrs, validateDosLogConf(dos.DosSecurityLog.ApDosLogConf, dos.DosSecurityLog.DosLogDest, fieldPath.Child("dosSecurityLog"))...)
-	}
-
-	return allErrs
-}
+//func validateDos(dos *v1.Dos, fieldPath *field.Path) field.ErrorList {
+//	allErrs := field.ErrorList{}
+//
+//	if dos.ApDosPolicy != "" {
+//		for _, msg := range validation.IsQualifiedName(dos.ApDosPolicy) {
+//			allErrs = append(allErrs, field.Invalid(fieldPath.Child("apDosPolicy"), dos.ApDosPolicy, msg))
+//		}
+//	}
+//
+//	if dos.Name != "" {
+//		err := ValidateAppProtectDosName(dos.Name)
+//		if err != nil {
+//			allErrs = append(allErrs, field.Invalid(fieldPath.Child("Name"), dos.Name, err.Error()))
+//		}
+//	}
+//
+//	if dos.ApDosMonitor != "" {
+//		err := ValidateAppProtectDosMonitor(dos.ApDosMonitor)
+//		if err != nil {
+//			allErrs = append(allErrs, field.Invalid(fieldPath.Child("ApDosMonitor"), dos.ApDosMonitor, err.Error()))
+//		}
+//	}
+//
+//	if dos.DosAccessLogDest != "" {
+//		allErrs = append(allErrs, validateDosLogAccessLogDest(dos.DosAccessLogDest, fieldPath.Child("dosAccessLogDest"))...)
+//	}
+//
+//	if dos.DosSecurityLog != nil {
+//		allErrs = append(allErrs, validateDosLogConf(dos.DosSecurityLog.ApDosLogConf, dos.DosSecurityLog.DosLogDest, fieldPath.Child("dosSecurityLog"))...)
+//	}
+//
+//	return allErrs
+//}
 
 func validateDosLogConf(logConf, logDest string, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}

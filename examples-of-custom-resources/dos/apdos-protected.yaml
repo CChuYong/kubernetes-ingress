@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: DosProtectedResource
+metadata:
+  name: dos-policy
+spec:
+  enable: true
+  name: "webapp.example.com"
+  apDosPolicy: "dospolicy"
+  apDosMonitor: "webapp.example.com"
+  #   dosAccessLogDest: "127.0.0.1:5561"
+  dosSecurityLog:
+    enable: true
+    apDosLogConf: "doslogconf"
+    dosLogDest: "127.0.0.1:514"

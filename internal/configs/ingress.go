@@ -27,8 +27,13 @@ type appProtectResources struct {
 
 // appProtectDosResources holds the file names of APDosPolicy and APDosLogConf resources used in an Ingress resource.
 type appProtectDosResources struct {
-	AppProtectDosPolicy   string
-	AppProtectDosLogconfs string
+	AppProtectDosEnable       string
+	AppProtectDosLogEnable    string
+	AppProtectDosMonitor      string
+	AppProtectDosName         string
+	AppProtectDosAccessLogDst string
+	AppProtectDosPolicyFile   string
+	AppProtectDosLogConfFile  string
 }
 
 // AppProtectLog holds a single pair of log config and log destination
@@ -39,19 +44,23 @@ type AppProtectLog struct {
 
 // IngressEx holds an Ingress along with the resources that are referenced in this Ingress.
 type IngressEx struct {
-	Ingress              *networking.Ingress
-	Endpoints            map[string][]string
-	HealthChecks         map[string]*api_v1.Probe
-	ExternalNameSvcs     map[string]bool
-	PodsByIP             map[string]PodInfo
-	ValidHosts           map[string]bool
-	ValidMinionPaths     map[string]bool
-	AppProtectPolicy     *unstructured.Unstructured
-	AppProtectLogs       []AppProtectLog
-	AppProtectDosPolicy  *unstructured.Unstructured
-	AppProtectDosLogConf *unstructured.Unstructured
-	AppProtectDosLogDst  string
-	SecretRefs           map[string]*secrets.SecretReference
+	Ingress                 *networking.Ingress
+	Endpoints               map[string][]string
+	HealthChecks            map[string]*api_v1.Probe
+	ExternalNameSvcs        map[string]bool
+	PodsByIP                map[string]PodInfo
+	ValidHosts              map[string]bool
+	ValidMinionPaths        map[string]bool
+	AppProtectPolicy        *unstructured.Unstructured
+	AppProtectLogs          []AppProtectLog
+	AppProtectDosResourceEx *DosProtectedEx
+	SecretRefs              map[string]*secrets.SecretReference
+}
+
+type DosProtectedEx struct {
+	DosProtected *unstructured.Unstructured
+	DosPolicy    *unstructured.Unstructured
+	DosLogConf   *unstructured.Unstructured
 }
 
 // JWTKey represents a secret that holds JSON Web Key.
@@ -74,7 +83,7 @@ type MergeableIngresses struct {
 	Minions []*IngressEx
 }
 
-func generateNginxCfg(ingEx *IngressEx, apResources *appProtectResources, dosResources *appProtectDosResources, isMinion bool,
+func generateNginxCfg(ingEx *IngressEx, apResources *appProtectResources, dosResource *appProtectDosResources, isMinion bool,
 	baseCfgParams *ConfigParams, isPlus bool, isResolverConfigured bool, staticParams *StaticConfigParams, isWildcardEnabled bool) (version1.IngressNginxConfig, Warnings) {
 	hasAppProtect := staticParams.MainAppProtectLoadModule
 	hasAppProtectDos := staticParams.MainAppProtectDosLoadModule
@@ -131,34 +140,29 @@ func generateNginxCfg(ingEx *IngressEx, apResources *appProtectResources, dosRes
 		statusZone := rule.Host
 
 		server := version1.Server{
-			Name:                      serverName,
-			ServerTokens:              cfgParams.ServerTokens,
-			HTTP2:                     cfgParams.HTTP2,
-			RedirectToHTTPS:           cfgParams.RedirectToHTTPS,
-			SSLRedirect:               cfgParams.SSLRedirect,
-			ProxyProtocol:             cfgParams.ProxyProtocol,
-			HSTS:                      cfgParams.HSTS,
-			HSTSMaxAge:                cfgParams.HSTSMaxAge,
-			HSTSIncludeSubdomains:     cfgParams.HSTSIncludeSubdomains,
-			HSTSBehindProxy:           cfgParams.HSTSBehindProxy,
-			StatusZone:                statusZone,
-			RealIPHeader:              cfgParams.RealIPHeader,
-			SetRealIPFrom:             cfgParams.SetRealIPFrom,
-			RealIPRecursive:           cfgParams.RealIPRecursive,
-			ProxyHideHeaders:          cfgParams.ProxyHideHeaders,
-			ProxyPassHeaders:          cfgParams.ProxyPassHeaders,
-			ServerSnippets:            cfgParams.ServerSnippets,
-			Ports:                     cfgParams.Ports,
-			SSLPorts:                  cfgParams.SSLPorts,
-			TLSPassthrough:            staticParams.TLSPassthrough,
-			AppProtectEnable:          cfgParams.AppProtectEnable,
-			AppProtectLogEnable:       cfgParams.AppProtectLogEnable,
-			AppProtectDosEnable:       cfgParams.AppProtectDosEnable,
-			AppProtectDosLogEnable:    cfgParams.AppProtectDosLogEnable,
-			AppProtectDosMonitor:      cfgParams.AppProtectDosMonitor,
-			AppProtectDosName:         cfgParams.AppProtectDosName,
-			AppProtectDosAccessLogDst: cfgParams.AppProtectDosAccessLogDst,
-			SpiffeCerts:               cfgParams.SpiffeServerCerts,
+			Name:                  serverName,
+			ServerTokens:          cfgParams.ServerTokens,
+			HTTP2:                 cfgParams.HTTP2,
+			RedirectToHTTPS:       cfgParams.RedirectToHTTPS,
+			SSLRedirect:           cfgParams.SSLRedirect,
+			ProxyProtocol:         cfgParams.ProxyProtocol,
+			HSTS:                  cfgParams.HSTS,
+			HSTSMaxAge:            cfgParams.HSTSMaxAge,
+			HSTSIncludeSubdomains: cfgParams.HSTSIncludeSubdomains,
+			HSTSBehindProxy:       cfgParams.HSTSBehindProxy,
+			StatusZone:            statusZone,
+			RealIPHeader:          cfgParams.RealIPHeader,
+			SetRealIPFrom:         cfgParams.SetRealIPFrom,
+			RealIPRecursive:       cfgParams.RealIPRecursive,
+			ProxyHideHeaders:      cfgParams.ProxyHideHeaders,
+			ProxyPassHeaders:      cfgParams.ProxyPassHeaders,
+			ServerSnippets:        cfgParams.ServerSnippets,
+			Ports:                 cfgParams.Ports,
+			SSLPorts:              cfgParams.SSLPorts,
+			TLSPassthrough:        staticParams.TLSPassthrough,
+			AppProtectEnable:      cfgParams.AppProtectEnable,
+			AppProtectLogEnable:   cfgParams.AppProtectLogEnable,
+			SpiffeCerts:           cfgParams.SpiffeServerCerts,
 		}
 
 		warnings := addSSLConfig(&server, ingEx.Ingress, rule.Host, ingEx.Ingress.Spec.TLS, ingEx.SecretRefs, isWildcardEnabled)
@@ -170,8 +174,13 @@ func generateNginxCfg(ingEx *IngressEx, apResources *appProtectResources, dosRes
 		}
 
 		if hasAppProtectDos {
-			server.AppProtectDosPolicy = dosResources.AppProtectDosPolicy
-			server.AppProtectDosLogConf = dosResources.AppProtectDosLogconfs
+			server.AppProtectDosEnable = dosResource.AppProtectDosEnable
+			server.AppProtectDosLogEnable = dosResource.AppProtectDosLogEnable
+			server.AppProtectDosMonitor = dosResource.AppProtectDosMonitor
+			server.AppProtectDosName = dosResource.AppProtectDosName
+			server.AppProtectDosAccessLogDst = dosResource.AppProtectDosAccessLogDst
+			server.AppProtectDosPolicyFile = dosResource.AppProtectDosPolicyFile
+			server.AppProtectDosLogConfFile = dosResource.AppProtectDosLogConfFile
 		}
 
 		if !isMinion && cfgParams.JWTKey != "" {

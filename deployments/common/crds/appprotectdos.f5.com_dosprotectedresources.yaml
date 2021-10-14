@@ -1,0 +1,63 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: dosprotectedresources.appprotectdos.f5.com
+spec:
+  group: appprotectdos.f5.com
+  names:
+    kind: DosProtectedResource
+    listKind: DosProtectedResourceList
+    plural: dosprotectedresources
+    shortNames:
+      - pr
+    singular: dosprotectedresource
+  scope: Namespaced
+  versions:
+    - name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: 'DosProtectedResource defines a collection of Dos protected resources. status: preview'
+          type: object
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                apDosMonitor:
+                  type: string
+                apDosPolicy:
+                  type: string
+                dosAccessLogDest:
+                  type: string
+                dosSecurityLog:
+                  description: DosSecurityLog defines the security log of a Dos policy.
+                  type: object
+                  properties:
+                    apDosLogConf:
+                      type: string
+                    dosLogDest:
+                      type: string
+                    enable:
+                      type: boolean
+                enable:
+                  type: boolean
+                name:
+                  type: string
+      served: true
+      storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

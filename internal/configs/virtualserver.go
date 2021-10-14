@@ -65,6 +65,7 @@ type VirtualServerEx struct {
 	LogConfRefs         map[string]*unstructured.Unstructured
 	ApDosPolRefs        map[string]*unstructured.Unstructured
 	DosLogConfRefs      map[string]*unstructured.Unstructured
+	DosProtectedRefs    map[string]*unstructured.Unstructured
 }
 
 func (vsx *VirtualServerEx) String() string {
@@ -1024,67 +1025,67 @@ func (p *policiesCfg) addWAFConfig(
 	return res
 }
 
-func (p *policiesCfg) addDosConfig(
-	dos *conf_v1.Dos,
-	polKey string,
-	polNamespace string,
-	dosResources *appProtectDosResourcesForVS,
-) *validationResults {
-	res := newValidationResults()
-	if p.Dos != nil {
-		res.addWarningf("Multiple Dos policies in the same context is not valid. Dos policy %s will be ignored", polKey)
-		return res
-	}
-
-	if dos.Enable {
-		p.Dos = &version2.Dos{Enable: "on"}
-	} else {
-		p.Dos = &version2.Dos{Enable: "off"}
-	}
-
-	p.Dos.Name = dos.Name
-
-	if dos.ApDosPolicy != "" {
-		apPolKey := dos.ApDosPolicy
-		hasNamepace := strings.Contains(apPolKey, "/")
-		if !hasNamepace {
-			apPolKey = fmt.Sprintf("%v/%v", polNamespace, apPolKey)
-		}
-
-		if apPolPath, exists := dosResources.Policies[apPolKey]; exists {
-			p.Dos.ApDosPolicy = apPolPath
-		} else {
-			res.addWarningf("Dos policy %s references an invalid or non-existing App Protect Dos policy %s", polKey, apPolKey)
-			res.isError = true
-			return res
-		}
-	}
-
-	if dos.DosSecurityLog != nil {
-		p.Dos.ApDosSecurityLogEnable = true
-
-		logConfKey := dos.DosSecurityLog.ApDosLogConf
-		hasNamepace := strings.Contains(logConfKey, "/")
-		if !hasNamepace {
-			logConfKey = fmt.Sprintf("%v/%v", polNamespace, logConfKey)
-		}
-
-		if logConfPath, ok := dosResources.LogConfs[logConfKey]; ok {
-			logDest := generateString(dos.DosSecurityLog.DosLogDest, "stderr")
-			p.Dos.ApDosLogConf = fmt.Sprintf("%s %s", logConfPath, generateDosLogDest(logDest))
-		} else {
-			res.addWarningf("Dos policy %s references an invalid or non-existing log config %s", polKey, logConfKey)
-			res.isError = true
-		}
-	}
-
-	if dos.DosAccessLogDest != "" {
-		p.Dos.ApDosAccessLogDest = generateDosLogDest(dos.DosAccessLogDest)
-	}
-	p.Dos.ApDosMonitor = dos.ApDosMonitor
-
-	return res
-}
+//func (p *policiesCfg) addDosConfig(
+//	dos *conf_v1.Dos,
+//	polKey string,
+//	polNamespace string,
+//	dosResources *appProtectDosResourcesForVS,
+//) *validationResults {
+//	res := newValidationResults()
+//	if p.Dos != nil {
+//		res.addWarningf("Multiple Dos policies in the same context is not valid. Dos policy %s will be ignored", polKey)
+//		return res
+//	}
+//
+//	if dos.Enable {
+//		p.Dos = &version2.Dos{Enable: "on"}
+//	} else {
+//		p.Dos = &version2.Dos{Enable: "off"}
+//	}
+//
+//	p.Dos.Name = dos.Name
+//
+//	if dos.ApDosPolicy != "" {
+//		apPolKey := dos.ApDosPolicy
+//		hasNamepace := strings.Contains(apPolKey, "/")
+//		if !hasNamepace {
+//			apPolKey = fmt.Sprintf("%v/%v", polNamespace, apPolKey)
+//		}
+//
+//		if apPolPath, exists := dosResources.Policies[apPolKey]; exists {
+//			p.Dos.ApDosPolicy = apPolPath
+//		} else {
+//			res.addWarningf("Dos policy %s references an invalid or non-existing App Protect Dos policy %s", polKey, apPolKey)
+//			res.isError = true
+//			return res
+//		}
+//	}
+//
+//	if dos.DosSecurityLog != nil {
+//		p.Dos.ApDosSecurityLogEnable = true
+//
+//		logConfKey := dos.DosSecurityLog.ApDosLogConf
+//		hasNamepace := strings.Contains(logConfKey, "/")
+//		if !hasNamepace {
+//			logConfKey = fmt.Sprintf("%v/%v", polNamespace, logConfKey)
+//		}
+//
+//		if logConfPath, ok := dosResources.LogConfs[logConfKey]; ok {
+//			logDest := generateString(dos.DosSecurityLog.DosLogDest, "stderr")
+//			p.Dos.ApDosLogConf = fmt.Sprintf("%s %s", logConfPath, generateDosLogDest(logDest))
+//		} else {
+//			res.addWarningf("Dos policy %s references an invalid or non-existing log config %s", polKey, logConfKey)
+//			res.isError = true
+//		}
+//	}
+//
+//	if dos.DosAccessLogDest != "" {
+//		p.Dos.ApDosAccessLogDest = generateDosLogDest(dos.DosAccessLogDest)
+//	}
+//	p.Dos.ApDosMonitor = dos.ApDosMonitor
+//
+//	return res
+//}
 
 func (vsc *virtualServerConfigurator) generatePolicies(
 	ownerDetails policyOwnerDetails,
@@ -1134,8 +1135,8 @@ func (vsc *virtualServerConfigurator) generatePolicies(
 				res = config.addOIDCConfig(pol.Spec.OIDC, key, polNamespace, policyOpts.secretRefs, vsc.oidcPolCfg)
 			case pol.Spec.WAF != nil:
 				res = config.addWAFConfig(pol.Spec.WAF, key, polNamespace, policyOpts.apResources)
-			case pol.Spec.Dos != nil:
-				res = config.addDosConfig(pol.Spec.Dos, key, polNamespace, policyOpts.dosResources)
+			//case pol.Spec.Dos != nil:
+			//	res = config.addDosConfig(pol.Spec.Dos, key, polNamespace, policyOpts.dosResources)
 			default:
 				res = newValidationResults()
 			}

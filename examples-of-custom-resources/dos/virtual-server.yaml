@@ -12,5 +12,7 @@ spec:
     - path: /
       policies:
         - name: dos-policy
+          apiGroup: appprotectdos.f5.com/v1beta1
+          kind: DosProtectedResource
       action:
         pass: webapp

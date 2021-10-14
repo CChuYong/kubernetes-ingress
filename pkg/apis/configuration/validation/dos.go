@@ -19,6 +19,10 @@ var appProtectDosLogConfRequiredFields = [][]string{
 	{"spec", "filter"},
 }
 
+var dosProtectedResourceRequiredFields = [][]string{
+	{"spec"},
+}
+
 const MaxNameLength = 63
 
 // ValidateAppProtectDosLogConf validates LogConfiguration resource
@@ -27,6 +31,16 @@ func ValidateAppProtectDosLogConf(logConf *unstructured.Unstructured) error {
 	err := ValidateRequiredFields(logConf, appProtectDosLogConfRequiredFields)
 	if err != nil {
 		return fmt.Errorf("Error validating App Protect Dos Log Configuration %v: %w", lcName, err)
+	}
+
+	return nil
+}
+
+func ValidateDosProtectedResource(protectedRes *unstructured.Unstructured) error {
+	name := protectedRes.GetName()
+	err := ValidateRequiredFields(protectedRes, dosProtectedResourceRequiredFields)
+	if err != nil {
+		return fmt.Errorf("error validating Dos Protected Resource %v: %w", name, err)
 	}
 
 	return nil

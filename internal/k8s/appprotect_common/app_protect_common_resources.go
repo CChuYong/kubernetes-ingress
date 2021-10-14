@@ -11,6 +11,14 @@ func GetNsName(obj *unstructured.Unstructured) string {
 	return obj.GetNamespace() + "/" + obj.GetName()
 }
 
+// GetNamespacedName returns the fully namespace qualified name, using default if the namespace is not found.
+func GetNamespacedName(namespaceName string) string {
+	if !strings.Contains(namespaceName, "/") {
+		return "default/" + namespaceName
+	}
+	return namespaceName
+}
+
 // ParseResourceReferenceAnnotation returns a namespace/name string
 func ParseResourceReferenceAnnotation(ns, antn string) string {
 	if !strings.Contains(antn, "/") {

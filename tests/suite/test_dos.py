@@ -1,12 +1,15 @@
 import requests
 import pytest
+import time
 
 from settings import TEST_DATA, DEPLOYMENTS
 from suite.custom_resources_utils import (
     create_dos_logconf_from_yaml,
     create_dos_policy_from_yaml,
+    create_dos_protected_from_yaml,
     delete_dos_policy,
     delete_dos_logconf,
+    delete_dos_protected,
 )
 from suite.resources_utils import (
     wait_before_test,
@@ -80,10 +83,15 @@ def dos_setup(
     src_pol_yaml = f"{TEST_DATA}/dos/dos-policy.yaml"
     pol_name = create_dos_policy_from_yaml(kube_apis.custom_objects, src_pol_yaml, test_namespace)
 
+    print(f"------------------------- Deploy protected resource ---------------------------")
+    src_protected_yaml = f"{TEST_DATA}/dos/dos-protected.yaml"
+    protected_name = create_dos_protected_from_yaml(kube_apis.custom_objects, src_protected_yaml, test_namespace)
+
     def fin():
         print("Clean up:")
         delete_dos_policy(kube_apis.custom_objects, pol_name, test_namespace)
         delete_dos_logconf(kube_apis.custom_objects, log_name, test_namespace)
+        delete_dos_protected(kube_apis.custom_objects, protected_name, test_namespace)
         delete_common_app(kube_apis, "simple", test_namespace)
         delete_items_from_yaml(kube_apis, src_sec_yaml, test_namespace)
         write_to_json(f"reload-{get_test_file_name(request.node.fspath)}.json", reload_times)
@@ -122,7 +130,7 @@ class TestDos:
         ]
 
         create_ingress_with_dos_annotations(
-            kube_apis, src_ing_yaml, test_namespace, "True", "True", "514"
+            kube_apis, src_ing_yaml, test_namespace, "dos-policy",
         )
 
         ingress_host = get_first_ingress_host_from_yaml(src_ing_yaml)
@@ -133,6 +141,7 @@ class TestDos:
         result_conf = get_ingress_nginx_template_conf(
             kube_apis.v1, test_namespace, "dos-ingress", pod_name, "nginx-ingress"
         )
+
         delete_items_from_yaml(kube_apis, src_ing_yaml, test_namespace)
 
         for _ in conf_annotations:
@@ -160,13 +169,21 @@ class TestDos:
         syslog_pod = kube_apis.v1.list_namespaced_pod(test_namespace).items[-1].metadata.name
 
         create_ingress_with_dos_annotations(
-            kube_apis, src_ing_yaml, test_namespace, "True", "True", "514"
+            kube_apis, src_ing_yaml, test_namespace, "dos-policy"
         )
         ingress_host = get_first_ingress_host_from_yaml(src_ing_yaml)
 
         print("--------- Run test while DOS module is enabled with correct policy ---------")
 
         ensure_response_from_backend(dos_setup.req_url, ingress_host, check404=True)
+        pod_name = get_first_pod_name(kube_apis.v1, "nginx-ingress")
+        result_conf = get_ingress_nginx_template_conf(
+            kube_apis.v1, test_namespace, "dos-ingress", pod_name, "nginx-ingress"
+        )
+
+        print("----------------------- wait ----------------------")
+
+        time.sleep(30)
 
         print("----------------------- Send request ----------------------")
         response = requests.get(
@@ -175,6 +192,10 @@ class TestDos:
         print(response.text)
         wait_before_test(10)
 
+        print("----------------------- wait ----------------------")
+        time.sleep(30)
+
+        print(f'log_loc {log_loc} syslog_pod {syslog_pod} test_namespace {test_namespace}')
         log_contents = get_file_contents(kube_apis.v1, log_loc, syslog_pod, test_namespace)
 
         delete_items_from_yaml(kube_apis, src_syslog_yaml, test_namespace)

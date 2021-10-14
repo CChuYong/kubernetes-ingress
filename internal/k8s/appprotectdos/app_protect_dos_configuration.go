@@ -43,6 +43,19 @@ var (
 		Version: "v1beta1",
 		Kind:    "APDosLogConf",
 	}
+
+	// DosProtectedResourceGVR is the group version resource of the dos protected resources
+	DosProtectedResourceGVR = schema.GroupVersionResource{
+		Group:    "appprotectdos.f5.com",
+		Version:  "v1beta1",
+		Resource: "dosprotectedresources",
+	}
+	// DosProtectedResourceGVK is the group version kind of the dos protected resources
+	DosProtectedResourceGVK = schema.GroupVersionKind{
+		Group:   "appprotectdos.f5.com",
+		Version: "v1beta1",
+		Kind:    "DosProtectedResource",
+	}
 )
 
 // Operation defines an operation to perform for an App Protect Dos resource.
@@ -77,15 +90,18 @@ type Problem struct {
 type Configuration interface {
 	AddOrUpdatePolicy(policyObj *unstructured.Unstructured) (changes []Change, problems []Problem)
 	AddOrUpdateLogConf(logConfObj *unstructured.Unstructured) (changes []Change, problems []Problem)
+	AddOrUpdateProtectedResource(logConfObj *unstructured.Unstructured) (changes []Change, problems []Problem)
 	GetAppResource(kind, key string) (*unstructured.Unstructured, error)
 	DeletePolicy(key string) (changes []Change, problems []Problem)
 	DeleteLogConf(key string) (changes []Change, problems []Problem)
+	DeleteProtectedResource(key string) (changes []Change, problems []Problem)
 }
 
 // ConfigurationImpl holds representations of App Protect Dos cluster resources
 type ConfigurationImpl struct {
-	dosPolicies map[string]*DosPolicyEx
-	dosLogConfs map[string]*DosLogConfEx
+	dosPolicies           map[string]*DosPolicyEx
+	dosLogConfs           map[string]*DosLogConfEx
+	dosProtectedResources map[string]*DosProtectedResourcesEx
 }
 
 // NewConfiguration creates a new App Protect Dos Configuration
@@ -96,8 +112,9 @@ func NewConfiguration() Configuration {
 // newConfigurationImpl creates a new App Protect Dos ConfigurationImpl
 func newConfigurationImpl() *ConfigurationImpl {
 	return &ConfigurationImpl{
-		dosPolicies: make(map[string]*DosPolicyEx),
-		dosLogConfs: make(map[string]*DosLogConfEx),
+		dosPolicies:           make(map[string]*DosPolicyEx),
+		dosLogConfs:           make(map[string]*DosLogConfEx),
+		dosProtectedResources: make(map[string]*DosProtectedResourcesEx),
 	}
 }
 
@@ -117,6 +134,27 @@ func createAppProtectDosPolicyEx(policyObj *unstructured.Unstructured) (*DosPoli
 
 	return &DosPolicyEx{
 		Obj:     policyObj,
+		IsValid: true,
+	}, nil
+}
+
+type DosProtectedResourcesEx struct {
+	Obj      *unstructured.Unstructured
+	IsValid  bool
+	ErrorMsg string
+}
+
+func createDosProtectedResourcesEx(protectedConf *unstructured.Unstructured) (*DosProtectedResourcesEx, error) {
+	err := validation.ValidateDosProtectedResource(protectedConf)
+	if err != nil {
+		return &DosProtectedResourcesEx{
+			Obj:      protectedConf,
+			IsValid:  false,
+			ErrorMsg: failedValidationErrorMsg,
+		}, err
+	}
+	return &DosProtectedResourcesEx{
+		Obj:     protectedConf,
 		IsValid: true,
 	}, nil
 }
@@ -168,25 +206,46 @@ func (ci *ConfigurationImpl) AddOrUpdateLogConf(logconfObj *unstructured.Unstruc
 	return append(changes, Change{Op: AddOrUpdate, Resource: logConf}), problems
 }
 
+// AddOrUpdateProtectedResource adds or updates App Protect Dos ProtectedResource Configuration
+func (ci *ConfigurationImpl) AddOrUpdateProtectedResource(protectedConf *unstructured.Unstructured) (changes []Change, problems []Problem) {
+	resNsName := appprotect_common.GetNsName(protectedConf)
+	protectedResource, err := createDosProtectedResourcesEx(protectedConf)
+	ci.dosProtectedResources[resNsName] = protectedResource
+	if err != nil {
+		return append(changes, Change{Op: Delete, Resource: protectedResource}),
+			append(problems, Problem{Object: protectedConf, Reason: "Rejected", Message: err.Error()})
+	}
+	return append(changes, Change{Op: AddOrUpdate, Resource: protectedResource}), problems
+}
+
 // GetAppResource returns a pointer to an App Protect Dos resource
 func (ci *ConfigurationImpl) GetAppResource(kind, key string) (*unstructured.Unstructured, error) {
+	name := appprotect_common.GetNamespacedName(key)
 	switch kind {
 	case DosPolicyGVK.Kind:
-		if obj, ok := ci.dosPolicies[key]; ok {
+		if obj, ok := ci.dosPolicies[name]; ok {
 			if obj.IsValid {
 				return obj.Obj, nil
 			}
 			return nil, fmt.Errorf(obj.ErrorMsg)
 		}
-		return nil, fmt.Errorf("App Protect Dos Policy %s not found", key)
+		return nil, fmt.Errorf("App Protect Dos Policy %s not found", name)
 	case DosLogConfGVK.Kind:
-		if obj, ok := ci.dosLogConfs[key]; ok {
+		if obj, ok := ci.dosLogConfs[name]; ok {
 			if obj.IsValid {
 				return obj.Obj, nil
 			}
 			return nil, fmt.Errorf(obj.ErrorMsg)
 		}
-		return nil, fmt.Errorf("App Protect DosLogConf %s not found", key)
+		return nil, fmt.Errorf("App Protect DosLogConf %s not found", name)
+	case DosProtectedResourceGVK.Kind:
+		if obj, ok := ci.dosProtectedResources[name]; ok {
+			if obj.IsValid {
+				return obj.Obj, nil
+			}
+			return nil, fmt.Errorf(obj.ErrorMsg)
+		}
+		return nil, fmt.Errorf("app Protect DosProtectedResource %s not found", name)
 	}
 	return nil, fmt.Errorf("Unknown App Protect Dos resource kind %s", kind)
 }
@@ -211,17 +270,29 @@ func (ci *ConfigurationImpl) DeleteLogConf(key string) (changes []Change, proble
 	return changes, problems
 }
 
+// DeleteProtectedResource deletes an App Protect Dos ProtectedResource Configuration
+func (ci *ConfigurationImpl) DeleteProtectedResource(key string) (changes []Change, problems []Problem) {
+	if _, has := ci.dosProtectedResources[key]; has {
+		change := Change{Op: Delete, Resource: ci.dosProtectedResources[key]}
+		delete(ci.dosProtectedResources, key)
+		return append(changes, change), problems
+	}
+	return changes, problems
+}
+
 // FakeConfiguration holds representations of fake App Protect Dos cluster resources
 type FakeConfiguration struct {
-	dosPolicies map[string]*DosPolicyEx
-	dosLogConfs map[string]*DosLogConfEx
+	dosPolicies           map[string]*DosPolicyEx
+	dosLogConfs           map[string]*DosLogConfEx
+	dosProtectedResources map[string]*DosProtectedResourcesEx
 }
 
 // NewFakeConfiguration creates a new App Protect Dos Configuration
 func NewFakeConfiguration() Configuration {
 	return &FakeConfiguration{
-		dosPolicies: make(map[string]*DosPolicyEx),
-		dosLogConfs: make(map[string]*DosLogConfEx),
+		dosPolicies:           make(map[string]*DosPolicyEx),
+		dosLogConfs:           make(map[string]*DosLogConfEx),
+		dosProtectedResources: make(map[string]*DosProtectedResourcesEx),
 	}
 }
 
@@ -247,6 +318,17 @@ func (fc *FakeConfiguration) AddOrUpdateLogConf(logConfObj *unstructured.Unstruc
 	return changes, problems
 }
 
+// AddOrUpdateProtectedResource adds or updates App Protect Dos Log Configuration to App Protect Dos Configuration
+func (fc *FakeConfiguration) AddOrUpdateProtectedResource(logConfObj *unstructured.Unstructured) (changes []Change, problems []Problem) {
+	resNsName := appprotect_common.GetNsName(logConfObj)
+	res := &DosProtectedResourcesEx{
+		Obj:     logConfObj,
+		IsValid: true,
+	}
+	fc.dosProtectedResources[resNsName] = res
+	return changes, problems
+}
+
 // GetAppResource returns a pointer to an App Protect Dos resource
 func (fc *FakeConfiguration) GetAppResource(kind, key string) (*unstructured.Unstructured, error) {
 	switch kind {
@@ -260,6 +342,11 @@ func (fc *FakeConfiguration) GetAppResource(kind, key string) (*unstructured.Uns
 			return obj.Obj, nil
 		}
 		return nil, fmt.Errorf("App Protect Dos LogConf %s not found", key)
+	case DosProtectedResourceGVK.Kind:
+		if obj, ok := fc.dosLogConfs[key]; ok {
+			return obj.Obj, nil
+		}
+		return nil, fmt.Errorf("App Protect Dos LogConf %s not found", key)
 	}
 	return nil, fmt.Errorf("Unknown App Protect Dos resource kind %s", kind)
 }
@@ -269,7 +356,12 @@ func (fc *FakeConfiguration) DeletePolicy(key string) (changes []Change, problem
 	return changes, problems
 }
 
-// DeleteLogConf deletes an App Protect Dos Log Configuration from App Protect Dos Configuration
+// DeleteLogConf deletes an App Protect Dos Portected resource from App Protect Dos Configuration
 func (fc *FakeConfiguration) DeleteLogConf(key string) (changes []Change, problems []Problem) {
+	return changes, problems
+}
+
+// DeleteProtectedResource deletes an App Protect Dos Protected resource from App Protect Dos Configuration
+func (fc *FakeConfiguration) DeleteProtectedResource(key string) (changes []Change, problems []Problem) {
 	return changes, problems
 }
