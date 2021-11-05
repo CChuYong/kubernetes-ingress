@@ -654,11 +654,11 @@ func createAppProtectDosLogConfHandlers(lbc *LoadBalancerController) cache.Resou
 	return handlers
 }
 
-func createAppProtectDosProtectedResourceHandlers(lbc *LoadBalancerController) cache.ResourceEventHandlerFuncs {
+func createAppProtectDosProtectedResourcesHandlers(lbc *LoadBalancerController) cache.ResourceEventHandlerFuncs {
 	handlers := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			conf := obj.(*unstructured.Unstructured)
-			glog.V(3).Infof("Adding DosProtectedResource: %v", conf.GetName())
+			glog.V(3).Infof("Adding DosProtectedResources: %v", conf.GetName())
 			lbc.AddSyncQueue(conf)
 		},
 		UpdateFunc: func(oldObj, obj interface{}) {
@@ -666,11 +666,11 @@ func createAppProtectDosProtectedResourceHandlers(lbc *LoadBalancerController) c
 			newConf := obj.(*unstructured.Unstructured)
 			different, err := areResourcesDifferent(oldConf, newConf)
 			if err != nil {
-				glog.V(3).Infof("Error when comparing DosProtectedResource %v", err)
+				glog.V(3).Infof("Error when comparing DosProtectedResources %v", err)
 				lbc.AddSyncQueue(newConf)
 			}
 			if different {
-				glog.V(3).Infof("DosProtectedResource %v changed, syncing", oldConf.GetName())
+				glog.V(3).Infof("DosProtectedResources %v changed, syncing", oldConf.GetName())
 				lbc.AddSyncQueue(newConf)
 			}
 		},

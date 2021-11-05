@@ -44,17 +44,17 @@ var (
 		Kind:    "APDosLogConf",
 	}
 
-	// DosProtectedResourceGVR is the group version resource of the dos protected resources
-	DosProtectedResourceGVR = schema.GroupVersionResource{
+	// DosProtectedResourcesGVR is the group version resource of the dos protected resources
+	DosProtectedResourcesGVR = schema.GroupVersionResource{
 		Group:    "appprotectdos.f5.com",
 		Version:  "v1beta1",
 		Resource: "dosprotectedresources",
 	}
-	// DosProtectedResourceGVK is the group version kind of the dos protected resources
-	DosProtectedResourceGVK = schema.GroupVersionKind{
+	// DosProtectedResourcesGVK is the group version kind of the dos protected resources
+	DosProtectedResourcesGVK = schema.GroupVersionKind{
 		Group:   "appprotectdos.f5.com",
 		Version: "v1beta1",
-		Kind:    "DosProtectedResource",
+		Kind:    "DosProtectedResources",
 	}
 )
 
@@ -145,7 +145,7 @@ type DosProtectedResourcesEx struct {
 }
 
 func createDosProtectedResourcesEx(protectedConf *unstructured.Unstructured) (*DosProtectedResourcesEx, error) {
-	err := validation.ValidateDosProtectedResource(protectedConf)
+	err := validation.ValidateDosProtectedResources(protectedConf)
 	if err != nil {
 		return &DosProtectedResourcesEx{
 			Obj:      protectedConf,
@@ -238,14 +238,14 @@ func (ci *ConfigurationImpl) GetAppResource(kind, key string) (*unstructured.Uns
 			return nil, fmt.Errorf(obj.ErrorMsg)
 		}
 		return nil, fmt.Errorf("App Protect DosLogConf %s not found", name)
-	case DosProtectedResourceGVK.Kind:
+	case DosProtectedResourcesGVK.Kind:
 		if obj, ok := ci.dosProtectedResources[name]; ok {
 			if obj.IsValid {
 				return obj.Obj, nil
 			}
 			return nil, fmt.Errorf(obj.ErrorMsg)
 		}
-		return nil, fmt.Errorf("app Protect DosProtectedResource %s not found", name)
+		return nil, fmt.Errorf("app Protect DosProtectedResources %s not found", name)
 	}
 	return nil, fmt.Errorf("Unknown App Protect Dos resource kind %s", kind)
 }
@@ -342,7 +342,7 @@ func (fc *FakeConfiguration) GetAppResource(kind, key string) (*unstructured.Uns
 			return obj.Obj, nil
 		}
 		return nil, fmt.Errorf("App Protect Dos LogConf %s not found", key)
-	case DosProtectedResourceGVK.Kind:
+	case DosProtectedResourcesGVK.Kind:
 		if obj, ok := fc.dosLogConfs[key]; ok {
 			return obj.Obj, nil
 		}

@@ -1290,10 +1290,10 @@ func (cnf *Configurator) updateApResources(ingEx *IngressEx) *appProtectResource
 func getDosProtectedStringValue(obj *unstructured.Unstructured, fields ...string) string {
 	val, has, err := unstructured.NestedString(obj.Object, fields...)
 	if err != nil {
-		glog.Warningf("failed to get value from DosProtectedResource: %v, %v", fields, err)
+		glog.Warningf("failed to get value from DosProtectedResources: %v, %v", fields, err)
 	}
 	if !has {
-		glog.Warningf("missing value from DosProtectedResource: %v, %v", fields, err)
+		glog.Warningf("missing value from DosProtectedResources: %v, %v", fields, err)
 	}
 	return val
 }
@@ -1301,10 +1301,10 @@ func getDosProtectedStringValue(obj *unstructured.Unstructured, fields ...string
 func getDosProtectedBoolValue(obj *unstructured.Unstructured, fields ...string) bool {
 	val, has, err := unstructured.NestedBool(obj.Object, fields...)
 	if err != nil {
-		glog.Warningf("failed to get value from DosProtectedResource: %v, %v", fields, err)
+		glog.Warningf("failed to get value from DosProtectedResources: %v, %v", fields, err)
 	}
 	if !has {
-		glog.Warningf("missing value from DosProtectedResource: %v, %v", fields, err)
+		glog.Warningf("missing value from DosProtectedResources: %v, %v", fields, err)
 	}
 	return val
 }

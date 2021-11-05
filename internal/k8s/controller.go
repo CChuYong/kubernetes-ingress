@@ -264,7 +264,7 @@ func NewLoadBalancerController(input NewLoadBalancerControllerInput) *LoadBalanc
 		if lbc.appProtectDosEnabled {
 			lbc.addAppProtectDosPolicyHandler(createAppProtectDosPolicyHandlers(lbc))
 			lbc.addAppProtectDosLogConfHandler(createAppProtectDosLogConfHandlers(lbc))
-			lbc.addAppProtectDosProtectedResourceHandler(createAppProtectDosProtectedResourceHandlers(lbc))
+			lbc.addAppProtectDosProtectedResourcesHandler(createAppProtectDosProtectedResourcesHandlers(lbc))
 		}
 	}
 
@@ -396,8 +396,8 @@ func (lbc *LoadBalancerController) addAppProtectDosLogConfHandler(handlers cache
 }
 
 // addAppProtectDosLogConfHandler creates dynamic informer for custom appprotectdos logging config resource
-func (lbc *LoadBalancerController) addAppProtectDosProtectedResourceHandler(handlers cache.ResourceEventHandlerFuncs) {
-	informer := lbc.dynInformerFactory.ForResource(appprotectdos.DosProtectedResourceGVR).Informer()
+func (lbc *LoadBalancerController) addAppProtectDosProtectedResourcesHandler(handlers cache.ResourceEventHandlerFuncs) {
+	informer := lbc.dynInformerFactory.ForResource(appprotectdos.DosProtectedResourcesGVR).Informer()
 	informer.AddEventHandler(handlers)
 	lbc.appProtectDosProtectedLister = informer.GetStore()
 
@@ -786,8 +786,8 @@ func (lbc *LoadBalancerController) sync(task task) {
 		lbc.syncAppProtectDosPolicy(task)
 	case appProtectDosLogConf:
 		lbc.syncAppProtectDosLogConf(task)
-	case appProtectDosProtectedResource:
-		lbc.syncDosProtectedResource(task)
+	case appProtectDosProtectedResources:
+		lbc.syncDosProtectedResources(task)
 	case ingressLink:
 		lbc.syncIngressLink(task)
 	}
@@ -1320,7 +1320,7 @@ func (lbc *LoadBalancerController) processAppProtectDosChanges(changes []appprot
 				lbc.processAppProtectDosProtectedResources(lbc.configurator.DeleteAppProtectDosPolicy, protectedResources...)
 
 			case *appprotectdos.DosProtectedResourcesEx:
-				lbc.processAppProtectDosProtectedResources(lbc.configurator.AddOrUpdateAppProtectResource, impl.Obj)
+				lbc.processAppProtectDosProtectedResources(lbc.configurator.DeleteAppProtectDosPolicy, impl.Obj)
 			}
 		}
 	}
@@ -1350,7 +1350,7 @@ func (lbc *LoadBalancerController) processAppProtectDosProtectedResources(f conf
 		resourceExes := lbc.createExtendedResources(resources)
 		warnings, updateErr := f(obj, resourceExes.IngressExes, resourceExes.MergeableIngresses, resourceExes.VirtualServerExes)
 		lbc.updateResourcesStatusAndEvents(resources, warnings, updateErr)
-		lbc.recorder.Eventf(obj, api_v1.EventTypeNormal, "AddedOrUpdated", "AppProtectDosProtectedResource %v was added or updated", namespace+"/"+name)
+		lbc.recorder.Eventf(obj, api_v1.EventTypeNormal, "AddedOrUpdated", "AppProtectDosProtectedResources %v was added or updated", namespace+"/"+name)
 	}
 }
 
@@ -2183,7 +2183,7 @@ func (lbc *LoadBalancerController) generateDosProtectedEx(parentNamespace string
 		key = fmt.Sprintf("%v/%v", parentNamespace, key)
 	}
 
-	dosProtected, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourceGVK.Kind, key)
+	dosProtected, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourcesGVK.Kind, key)
 	if err != nil {
 		return nil, fmt.Errorf("dos policy %v is invalid: %w", key, err)
 	}
@@ -2477,7 +2477,7 @@ func (lbc *LoadBalancerController) getAppProtectPolicy(ing *networking.Ingress) 
 
 //func (lbc *LoadBalancerController) getAppProtectDosProtectedResource(ing *networking.Ingress) (*unstructured.Unstructured, error) {
 //	nameNamespace := appprotect_common.ParseResourceReferenceAnnotation(ing.Namespace, ing.Annotations[configs.AppProtectDosProtectedAnnotation])
-//	resource, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourceGVK.Kind, nameNamespace)
+//	resource, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourcesGVK.Kind, nameNamespace)
 //	if err != nil {
 //		return nil, fmt.Errorf("Error retrieving App Protect Dos Policy for Ingress %v: %w ", ing.Name, err)
 //	}
@@ -2973,7 +2973,7 @@ func getDosProtectedForAppProtectDosPolicy(resources []*unstructured.Unstructure
 	for _, res := range resources {
 		value, has, err := unstructured.NestedString(res.Object, "spec", "apDosPolicy")
 		if err != nil {
-			glog.Warningf("error getting apDosPolicy from DosProtectedResource %v: %v", res.GetName(), err)
+			glog.Warningf("error getting apDosPolicy from DosProtectedResources %v: %v", res.GetName(), err)
 		}
 		if has && isMatchingResourceRef(res.GetNamespace(), value, key) {
 			matching = append(matching, res)
@@ -2989,7 +2989,7 @@ func getDosProtectedForAppProtectLogConf(resources []*unstructured.Unstructured,
 	for _, res := range resources {
 		value, has, err := unstructured.NestedString(res.Object, "spec", "dosSecurityLog", "apDosLogConf")
 		if err != nil {
-			glog.Warningf("error getting apDosPolicy from DosProtectedResource %v: %v", res.GetName(), err)
+			glog.Warningf("error getting apDosPolicy from DosProtectedResources %v: %v", res.GetName(), err)
 		}
 		if has && isMatchingResourceRef(res.GetNamespace(), value, key) {
 			matching = append(matching, res)
@@ -3547,9 +3547,9 @@ func (lbc *LoadBalancerController) syncAppProtectDosLogConf(task task) {
 	lbc.processAppProtectDosProblems(problems)
 }
 
-func (lbc *LoadBalancerController) syncDosProtectedResource(task task) {
+func (lbc *LoadBalancerController) syncDosProtectedResources(task task) {
 	key := task.Key
-	glog.V(3).Infof("Syncing DosProtectedResource %v", key)
+	glog.V(3).Infof("Syncing DosProtectedResources %v", key)
 	obj, confExists, err := lbc.appProtectDosProtectedLister.GetByKey(key)
 	if err != nil {
 		lbc.syncQueue.Requeue(task, err)
@@ -3560,10 +3560,10 @@ func (lbc *LoadBalancerController) syncDosProtectedResource(task task) {
 	var problems []appprotectdos.Problem
 
 	if !confExists {
-		glog.V(2).Infof("Deleting DosProtectedResource: %v\n", key)
+		glog.V(2).Infof("Deleting DosProtectedResources: %v\n", key)
 		changes, problems = lbc.appProtectDosConfiguration.DeleteProtectedResource(key)
 	} else {
-		glog.V(2).Infof("Adding or Updating DosProtectedResource: %v\n", key)
+		glog.V(2).Infof("Adding or Updating DosProtectedResources: %v\n", key)
 		changes, problems = lbc.appProtectDosConfiguration.AddOrUpdateProtectedResource(obj.(*unstructured.Unstructured))
 	}
 

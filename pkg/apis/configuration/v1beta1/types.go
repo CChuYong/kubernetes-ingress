@@ -7,37 +7,44 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +kubebuilder:validation:Optional
 // +kubebuilder:resource:shortName=pr
 
-// DosProtectedResource defines a collection of Dos protected resources.
-// status: preview
-type DosProtectedResource struct {
+// DosProtectedResources defines a collection of Dos protected resources.
+type DosProtectedResources struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec DosProtectedResourceSpec `json:"spec"`
+	Spec DosProtectedResourcesSpec `json:"spec"`
 }
 
-type DosProtectedResourceSpec struct {
-	Enable           bool            `json:"enable"`
-	Name             string          `json:"name"`
-	ApDosMonitor     string          `json:"apDosMonitor"`
-	DosAccessLogDest string          `json:"dosAccessLogDest"`
-	ApDosPolicy      string          `json:"apDosPolicy"`
-	DosSecurityLog   *DosSecurityLog `json:"dosSecurityLog"`
+type DosProtectedResourcesSpec struct {
+	// Enable enables the DOS feature if set to true
+	Enable bool `json:"enable"`
+	// Name is the name of the domain
+	Name string `json:"name"`
+	// ApDosMonitor is the domain name to monitor
+	ApDosMonitor string `json:"apDosMonitor"`
+	// DosAccessLogDest is the network address for the access logs
+	DosAccessLogDest string `json:"dosAccessLogDest"`
+	// ApDosPolicy is the namespace/name of a ApDosPolicy resource
+	ApDosPolicy    string          `json:"apDosPolicy"`
+	DosSecurityLog *DosSecurityLog `json:"dosSecurityLog"`
 }
 
-// DosSecurityLog defines the security log of a Dos policy.
+// DosSecurityLog defines the security log of the DosProtectedResources.
 type DosSecurityLog struct {
-	Enable       bool   `json:"enable"`
+	// Enable enables the security logging feature if set to true
+	Enable bool `json:"enable"`
+	// ApDosLogConf is the namespace/name of a APDosLogConf resource
 	ApDosLogConf string `json:"apDosLogConf"`
-	DosLogDest   string `json:"dosLogDest"`
+	// DosLogDest is the network address of a logging service, can be either IP or DNS name.
+	DosLogDest string `json:"dosLogDest"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// DosProtectedResourceList is a list of the DosProtectedResource resources.
+// DosProtectedResourceList is a list of the DosProtectedResources resources.
 type DosProtectedResourceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []DosProtectedResource `json:"items"`
+	Items []DosProtectedResources `json:"items"`
 }
