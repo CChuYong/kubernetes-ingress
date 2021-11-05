@@ -1378,7 +1378,7 @@ func TestUpdateApDosResources(t *testing.T) {
 				Ingress: &networking.Ingress{
 					ObjectMeta: meta_v1.ObjectMeta{},
 				},
-				AppProtectDosResourceEx: &DosProtectedEx{
+				DosResourceEx: &DosProtectedEx{
 					DosProtected: appProtectDosProtected,
 				},
 			},
@@ -1395,7 +1395,7 @@ func TestUpdateApDosResources(t *testing.T) {
 				Ingress: &networking.Ingress{
 					ObjectMeta: meta_v1.ObjectMeta{},
 				},
-				AppProtectDosResourceEx: &DosProtectedEx{
+				DosResourceEx: &DosProtectedEx{
 					DosProtected: appProtectDosProtected,
 					DosPolicy:    appProtectDosPolicy,
 				},
@@ -1414,7 +1414,7 @@ func TestUpdateApDosResources(t *testing.T) {
 				Ingress: &networking.Ingress{
 					ObjectMeta: meta_v1.ObjectMeta{},
 				},
-				AppProtectDosResourceEx: &DosProtectedEx{
+				DosResourceEx: &DosProtectedEx{
 					DosProtected: appProtectDosProtectedWithLog,
 					DosPolicy:    appProtectDosPolicy,
 					DosLogConf:   appProtectDosLogConf,
@@ -1426,7 +1426,7 @@ func TestUpdateApDosResources(t *testing.T) {
 				AppProtectDosMonitor:      "monitor-name",
 				AppProtectDosAccessLogDst: "access-log-dest",
 				AppProtectDosPolicyFile:   "/etc/nginx/dos/policies/test-ns_test-name.json",
-				AppProtectDosLogEnable:    "on",
+				AppProtectDosLogEnable:    true,
 				AppProtectDosLogConfFile:  "/etc/nginx/dos/logconfs/test-ns_test-name.json syslog:server=log-dest",
 			},
 			msg: "app protect dos policy and log conf",
@@ -1439,7 +1439,7 @@ func TestUpdateApDosResources(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := conf.updateApDosResources(test.ingEx)
+		result := conf.updateApDosResources(test.ingEx.DosResourceEx)
 		if !reflect.DeepEqual(result, test.expected) {
 			t.Errorf("updateApResources() returned \n%v but expected\n%v for the case of %s", result, test.expected, test.msg)
 		}

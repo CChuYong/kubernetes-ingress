@@ -265,7 +265,7 @@ func (cnf *Configurator) AddOrUpdateIngress(ingEx *IngressEx) (Warnings, error) 
 
 func (cnf *Configurator) addOrUpdateIngress(ingEx *IngressEx) (Warnings, error) {
 	apResources := cnf.updateApResources(ingEx)
-	dosResources := cnf.updateApDosResources(ingEx)
+	dosResources := cnf.updateApDosResources(ingEx.DosResourceEx)
 
 	if jwtKey, exists := ingEx.Ingress.Annotations[JWTKeyAnnotation]; exists {
 		// LocalSecretStore will not set Path if the secret is not on the filesystem.
@@ -307,7 +307,7 @@ func (cnf *Configurator) AddOrUpdateMergeableIngress(mergeableIngs *MergeableIng
 
 func (cnf *Configurator) addOrUpdateMergeableIngress(mergeableIngs *MergeableIngresses) (Warnings, error) {
 	apResources := cnf.updateApResources(mergeableIngs.Master)
-	dosResources := cnf.updateApDosResources(mergeableIngs.Master)
+	dosResources := cnf.updateApDosResources(mergeableIngs.Master.DosResourceEx)
 
 	// LocalSecretStore will not set Path if the secret is not on the filesystem.
 	// However, NGINX configuration for an Ingress resource, to handle the case of a missing secret,
@@ -444,7 +444,7 @@ func (cnf *Configurator) addOrUpdateOpenTracingTracerConfig(content string) erro
 
 func (cnf *Configurator) addOrUpdateVirtualServer(virtualServerEx *VirtualServerEx) (Warnings, error) {
 	apResources := cnf.updateApResourcesForVs(virtualServerEx)
-	dosResources := cnf.updateApDosResourcesForVS(virtualServerEx)
+	dosResources := cnf.updateApDosResources(virtualServerEx.DosProtectedEx)
 
 	name := getFileNameForVirtualServer(virtualServerEx.VirtualServer)
 
@@ -1309,12 +1309,11 @@ func getDosProtectedBoolValue(obj *unstructured.Unstructured, fields ...string) 
 	return val
 }
 
-func (cnf *Configurator) updateApDosResources(ingEx *IngressEx) *appProtectDosResources {
+func (cnf *Configurator) updateApDosResources(dosEx *DosProtectedEx) *appProtectDosResources {
 	var dosResources appProtectDosResources
-	if ingEx.AppProtectDosResourceEx != nil {
-		if ingEx.AppProtectDosResourceEx.DosProtected != nil {
-
-			protected := ingEx.AppProtectDosResourceEx.DosProtected
+	if dosEx != nil {
+		if dosEx.DosProtected != nil {
+			protected := dosEx.DosProtected
 			dosResources.AppProtectDosEnable = "off"
 			if getDosProtectedBoolValue(protected, "spec", "enable") {
 				dosResources.AppProtectDosEnable = "on"
@@ -1323,27 +1322,22 @@ func (cnf *Configurator) updateApDosResources(ingEx *IngressEx) *appProtectDosRe
 			dosResources.AppProtectDosMonitor = getDosProtectedStringValue(protected, "spec", "apDosMonitor")
 			dosResources.AppProtectDosAccessLogDst = getDosProtectedStringValue(protected, "spec", "dosAccessLogDest")
 
-			if ingEx.AppProtectDosResourceEx.DosPolicy != nil {
-				pol := ingEx.AppProtectDosResourceEx.DosPolicy
+			if dosEx.DosPolicy != nil {
+				pol := dosEx.DosPolicy
 				policyFileName := appProtectDosPolicyFileNameFromUnstruct(pol)
 				policyContent := generateApResourceFileContent(pol)
 				cnf.nginxManager.CreateAppProtectResourceFile(policyFileName, policyContent)
 				dosResources.AppProtectDosPolicyFile = policyFileName
 			}
 
-			if ingEx.AppProtectDosResourceEx.DosLogConf != nil {
-				log := ingEx.AppProtectDosResourceEx.DosLogConf
+			if dosEx.DosLogConf != nil {
+				log := dosEx.DosLogConf
 				logConfFileName := appProtectDosLogConfFileNameFromUnstruct(log)
 				logConfContent := generateApResourceFileContent(log)
 				cnf.nginxManager.CreateAppProtectResourceFile(logConfFileName, logConfContent)
 				logDest := getDosProtectedStringValue(protected, "spec", "dosSecurityLog", "dosLogDest")
 				dosResources.AppProtectDosLogConfFile = logConfFileName + " " + generateDosLogDest(logDest)
-				enabled := getDosProtectedBoolValue(protected, "spec", "dosSecurityLog", "enable")
-				if enabled {
-					dosResources.AppProtectDosLogEnable = "on"
-				} else {
-					dosResources.AppProtectDosLogEnable = "off"
-				}
+				dosResources.AppProtectDosLogEnable = getDosProtectedBoolValue(protected, "spec", "dosSecurityLog", "enable")
 			}
 		}
 	}
@@ -1363,26 +1357,6 @@ func (cnf *Configurator) updateApResourcesForVs(vsEx *VirtualServerEx) *appProte
 
 	for logConfKey, logConf := range vsEx.LogConfRefs {
 		logConfFileName := appProtectLogConfFileNameFromUnstruct(logConf)
-		logConfContent := generateApResourceFileContent(logConf)
-		cnf.nginxManager.CreateAppProtectResourceFile(logConfFileName, logConfContent)
-		resources.LogConfs[logConfKey] = logConfFileName
-	}
-
-	return resources
-}
-
-func (cnf *Configurator) updateApDosResourcesForVS(vsEx *VirtualServerEx) *appProtectDosResourcesForVS {
-	resources := newAppProtectDosVSResourcesForVS()
-
-	for apPolKey, apPol := range vsEx.ApDosPolRefs {
-		policyFileName := appProtectDosPolicyFileNameFromUnstruct(apPol)
-		policyContent := generateApResourceFileContent(apPol)
-		cnf.nginxManager.CreateAppProtectResourceFile(policyFileName, policyContent)
-		resources.Policies[apPolKey] = policyFileName
-	}
-
-	for logConfKey, logConf := range vsEx.DosLogConfRefs {
-		logConfFileName := appProtectDosLogConfFileNameFromUnstruct(logConf)
 		logConfContent := generateApResourceFileContent(logConf)
 		cnf.nginxManager.CreateAppProtectResourceFile(logConfFileName, logConfContent)
 		resources.LogConfs[logConfKey] = logConfFileName

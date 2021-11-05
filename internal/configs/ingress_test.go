@@ -1427,7 +1427,7 @@ func TestGenerateNginxCfgForAppProtectDos(t *testing.T) {
 		AppProtectDosMonitor:      "monitor-name",
 		AppProtectDosAccessLogDst: "access-log-dest",
 		AppProtectDosPolicyFile:   "/etc/nginx/dos/policies/default_policy",
-		AppProtectDosLogEnable:    "on",
+		AppProtectDosLogEnable:    true,
 		AppProtectDosLogConfFile:  "/etc/nginx/dos/logconfs/default_logconf syslog:server=127.0.0.1:514",
 	}
 	staticCfgParams := &StaticConfigParams{
@@ -1438,7 +1438,7 @@ func TestGenerateNginxCfgForAppProtectDos(t *testing.T) {
 	expected.Servers[0].AppProtectDosEnable = "on"
 	expected.Servers[0].AppProtectDosPolicyFile = "/etc/nginx/dos/policies/default_policy"
 	expected.Servers[0].AppProtectDosLogConfFile = "/etc/nginx/dos/logconfs/default_logconf syslog:server=127.0.0.1:514"
-	expected.Servers[0].AppProtectDosLogEnable = "on"
+	expected.Servers[0].AppProtectDosLogEnable = true
 	expected.Servers[0].AppProtectDosName = "dos.example.com"
 	expected.Servers[0].AppProtectDosMonitor = "monitor-name"
 	expected.Servers[0].AppProtectDosAccessLogDst = "access-log-dest"
@@ -1456,7 +1456,7 @@ func TestGenerateNginxCfgForAppProtectDos(t *testing.T) {
 func TestGenerateNginxCfgForMergeableIngressesForAppProtectDos(t *testing.T) {
 	mergeableIngresses := createMergeableCafeIngress()
 	mergeableIngresses.Master.Ingress.Annotations["appprotectdos.f5.com/app-protect-dos-enable"] = "True"
-	mergeableIngresses.Master.AppProtectDosResourceEx = &DosProtectedEx{
+	mergeableIngresses.Master.DosResourceEx = &DosProtectedEx{
 		DosPolicy: &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"metadata": map[string]interface{}{
@@ -1483,7 +1483,7 @@ func TestGenerateNginxCfgForMergeableIngressesForAppProtectDos(t *testing.T) {
 		AppProtectDosMonitor:      "monitor-name",
 		AppProtectDosAccessLogDst: "access-log-dest",
 		AppProtectDosPolicyFile:   "/etc/nginx/dos/policies/default_policy",
-		AppProtectDosLogEnable:    "on",
+		AppProtectDosLogEnable:    true,
 		AppProtectDosLogConfFile:  "/etc/nginx/dos/logconfs/default_logconf syslog:server=127.0.0.1:514",
 	}
 	staticCfgParams := &StaticConfigParams{
@@ -1494,7 +1494,7 @@ func TestGenerateNginxCfgForMergeableIngressesForAppProtectDos(t *testing.T) {
 	expected.Servers[0].AppProtectDosEnable = "on"
 	expected.Servers[0].AppProtectDosPolicyFile = "/etc/nginx/dos/policies/default_policy"
 	expected.Servers[0].AppProtectDosLogConfFile = "/etc/nginx/dos/logconfs/default_logconf syslog:server=127.0.0.1:514"
-	expected.Servers[0].AppProtectDosLogEnable = "on"
+	expected.Servers[0].AppProtectDosLogEnable = true
 	expected.Servers[0].AppProtectDosName = "dos.example.com"
 	expected.Servers[0].AppProtectDosMonitor = "monitor-name"
 	expected.Servers[0].AppProtectDosAccessLogDst = "access-log-dest"

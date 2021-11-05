@@ -63,9 +63,8 @@ type VirtualServerEx struct {
 	SecretRefs          map[string]*secrets.SecretReference
 	ApPolRefs           map[string]*unstructured.Unstructured
 	LogConfRefs         map[string]*unstructured.Unstructured
-	ApDosPolRefs        map[string]*unstructured.Unstructured
-	DosLogConfRefs      map[string]*unstructured.Unstructured
 	DosProtectedRefs    map[string]*unstructured.Unstructured
+	DosProtectedEx      *DosProtectedEx
 }
 
 func (vsx *VirtualServerEx) String() string {
@@ -88,19 +87,6 @@ type appProtectResourcesForVS struct {
 
 func newAppProtectVSResourcesForVS() *appProtectResourcesForVS {
 	return &appProtectResourcesForVS{
-		Policies: make(map[string]string),
-		LogConfs: make(map[string]string),
-	}
-}
-
-// appProtectResourcesForVS holds file names of APDosPolicy and APDosLogConf resources used in a VirtualServer.
-type appProtectDosResourcesForVS struct {
-	Policies map[string]string
-	LogConfs map[string]string
-}
-
-func newAppProtectDosVSResourcesForVS() *appProtectDosResourcesForVS {
-	return &appProtectDosResourcesForVS{
 		Policies: make(map[string]string),
 		LogConfs: make(map[string]string),
 	}
@@ -293,7 +279,7 @@ func (vsc *virtualServerConfigurator) generateEndpointsForUpstream(
 func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 	vsEx *VirtualServerEx,
 	apResources *appProtectResourcesForVS,
-	dosResources *appProtectDosResourcesForVS,
+	dosResources *appProtectDosResources,
 ) (version2.VirtualServerConfig, Warnings) {
 	vsc.clearWarnings()
 
@@ -301,10 +287,9 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 	tlsRedirectConfig := generateTLSRedirectConfig(vsEx.VirtualServer.Spec.TLS)
 
 	policyOpts := policyOptions{
-		tls:          sslConfig != nil,
-		secretRefs:   vsEx.SecretRefs,
-		apResources:  apResources,
-		dosResources: dosResources,
+		tls:         sslConfig != nil,
+		secretRefs:  vsEx.SecretRefs,
+		apResources: apResources,
 	}
 
 	ownerDetails := policyOwnerDetails{
@@ -314,6 +299,7 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 		vsName:         vsEx.VirtualServer.Name,
 	}
 	policiesCfg := vsc.generatePolicies(ownerDetails, vsEx.VirtualServer.Spec.Policies, vsEx.Policies, specContext, policyOpts)
+	dosCfg := vsc.generateDosCfg(dosResources)
 
 	// crUpstreams maps an UpstreamName to its conf_v1.Upstream as they are generated
 	// necessary for generateLocation to know what Upstream each Location references
@@ -631,7 +617,7 @@ func (vsc *virtualServerConfigurator) GenerateVirtualServerConfig(
 			EgressMTLS:                policiesCfg.EgressMTLS,
 			OIDC:                      vsc.oidcPolCfg.oidc,
 			WAF:                       policiesCfg.WAF,
-			Dos:                       policiesCfg.Dos,
+			Dos:                       dosCfg,
 			PoliciesErrorReturn:       policiesCfg.ErrorReturn,
 			VSNamespace:               vsEx.VirtualServer.Namespace,
 			VSName:                    vsEx.VirtualServer.Name,
@@ -669,10 +655,9 @@ type policyOwnerDetails struct {
 }
 
 type policyOptions struct {
-	tls          bool
-	secretRefs   map[string]*secrets.SecretReference
-	apResources  *appProtectResourcesForVS
-	dosResources *appProtectDosResourcesForVS
+	tls         bool
+	secretRefs  map[string]*secrets.SecretReference
+	apResources *appProtectResourcesForVS
 }
 
 type validationResults struct {
@@ -1086,6 +1071,21 @@ func (p *policiesCfg) addWAFConfig(
 //
 //	return res
 //}
+
+func (vsc *virtualServerConfigurator) generateDosCfg(dosResources *appProtectDosResources) *version2.Dos {
+	if dosResources == nil {
+		return nil
+	}
+	dos := &version2.Dos{}
+	dos.Enable = dosResources.AppProtectDosEnable
+	dos.Name = dosResources.AppProtectDosName
+	dos.ApDosMonitor = dosResources.AppProtectDosMonitor
+	dos.ApDosAccessLogDest = dosResources.AppProtectDosAccessLogDst
+	dos.ApDosPolicy = dosResources.AppProtectDosPolicyFile
+	dos.ApDosSecurityLogEnable = dosResources.AppProtectDosLogEnable
+	dos.ApDosLogConf = dosResources.AppProtectDosLogConfFile
+	return dos
+}
 
 func (vsc *virtualServerConfigurator) generatePolicies(
 	ownerDetails policyOwnerDetails,

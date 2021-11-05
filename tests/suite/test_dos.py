@@ -163,8 +163,6 @@ class TestDos:
 
         create_items_from_yaml(kube_apis, src_syslog_yaml, test_namespace)
 
-        syslog_ep = get_service_endpoint(kube_apis, "syslog-svc", test_namespace)
-
         # items[-1] because syslog pod is last one to spin-up
         syslog_pod = kube_apis.v1.list_namespaced_pod(test_namespace).items[-1].metadata.name
 
@@ -177,13 +175,9 @@ class TestDos:
 
         ensure_response_from_backend(dos_setup.req_url, ingress_host, check404=True)
         pod_name = get_first_pod_name(kube_apis.v1, "nginx-ingress")
-        result_conf = get_ingress_nginx_template_conf(
+        get_ingress_nginx_template_conf(
             kube_apis.v1, test_namespace, "dos-ingress", pod_name, "nginx-ingress"
         )
-
-        print("----------------------- wait ----------------------")
-
-        time.sleep(30)
 
         print("----------------------- Send request ----------------------")
         response = requests.get(
@@ -191,9 +185,6 @@ class TestDos:
         )
         print(response.text)
         wait_before_test(10)
-
-        print("----------------------- wait ----------------------")
-        time.sleep(30)
 
         print(f'log_loc {log_loc} syslog_pod {syslog_pod} test_namespace {test_namespace}')
         log_contents = get_file_contents(kube_apis.v1, log_loc, syslog_pod, test_namespace)

@@ -25,17 +25,6 @@ type appProtectResources struct {
 	AppProtectLogconfs []string
 }
 
-// appProtectDosResources holds the file names of APDosPolicy and APDosLogConf resources used in an Ingress resource.
-type appProtectDosResources struct {
-	AppProtectDosEnable       string
-	AppProtectDosLogEnable    string
-	AppProtectDosMonitor      string
-	AppProtectDosName         string
-	AppProtectDosAccessLogDst string
-	AppProtectDosPolicyFile   string
-	AppProtectDosLogConfFile  string
-}
-
 // AppProtectLog holds a single pair of log config and log destination
 type AppProtectLog struct {
 	LogConf *unstructured.Unstructured
@@ -44,17 +33,17 @@ type AppProtectLog struct {
 
 // IngressEx holds an Ingress along with the resources that are referenced in this Ingress.
 type IngressEx struct {
-	Ingress                 *networking.Ingress
-	Endpoints               map[string][]string
-	HealthChecks            map[string]*api_v1.Probe
-	ExternalNameSvcs        map[string]bool
-	PodsByIP                map[string]PodInfo
-	ValidHosts              map[string]bool
-	ValidMinionPaths        map[string]bool
-	AppProtectPolicy        *unstructured.Unstructured
-	AppProtectLogs          []AppProtectLog
-	AppProtectDosResourceEx *DosProtectedEx
-	SecretRefs              map[string]*secrets.SecretReference
+	Ingress          *networking.Ingress
+	Endpoints        map[string][]string
+	HealthChecks     map[string]*api_v1.Probe
+	ExternalNameSvcs map[string]bool
+	PodsByIP         map[string]PodInfo
+	ValidHosts       map[string]bool
+	ValidMinionPaths map[string]bool
+	AppProtectPolicy *unstructured.Unstructured
+	AppProtectLogs   []AppProtectLog
+	DosResourceEx    *DosProtectedEx
+	SecretRefs       map[string]*secrets.SecretReference
 }
 
 type DosProtectedEx struct {

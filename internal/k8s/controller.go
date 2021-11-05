@@ -2171,39 +2171,95 @@ func (lbc *LoadBalancerController) createMergeableIngresses(ingConfig *IngressCo
 	}
 }
 
-func (lbc *LoadBalancerController) createAppProtectDosResourceEx(protectedRes *unstructured.Unstructured) *configs.DosProtectedEx {
-	dosProtectedEx := &configs.DosProtectedEx{
-		DosProtected: protectedRes,
+// addDosPolicyRefs ensures the app protect dos resources that are referenced in policies exist.
+func (lbc *LoadBalancerController) generateDosProtectedEx(parentNamespace string, dosRef string) (*configs.DosProtectedEx, error) {
+
+	if dosRef == "" {
+		return nil, nil
 	}
 
-	pol, has, err := unstructured.NestedString(protectedRes.Object, "spec", "apDosPolicy")
+	key := dosRef
+	if !strings.Contains(key, "/") {
+		key = fmt.Sprintf("%v/%v", parentNamespace, key)
+	}
+
+	dosProtected, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourceGVK.Kind, key)
 	if err != nil {
-		glog.Warningf("error getting Dos policy name %v for Dos Protected Resource %v/%v: %v", pol, protectedRes.GetNamespace(), protectedRes.GetName(), err)
+		return nil, fmt.Errorf("dos policy %v is invalid: %w", key, err)
 	}
-	if has {
-		dosPol, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosPolicyGVK.Kind, pol)
-		if err != nil {
-			glog.Warningf("error getting Dos policy %v for Dos Protected Resource %v/%v: %v", pol, protectedRes.GetNamespace(), protectedRes.GetName(), err)
-		} else {
-			dosProtectedEx.DosPolicy = dosPol
-		}
+	dosEx := &configs.DosProtectedEx{
+		DosProtected: dosProtected,
 	}
 
-	log, has, err := unstructured.NestedString(protectedRes.Object, "spec", "dosSecurityLog", "apDosLogConf")
+	dosPolicyRef, found, err := unstructured.NestedString(dosProtected.Object, "spec", "apDosPolicy")
 	if err != nil {
-		glog.Warningf("error getting Dos log conf name %v for Dos Protected Resource %v/%v: %v", pol, protectedRes.GetNamespace(), protectedRes.GetName(), err)
+		return nil, fmt.Errorf("failed to get field from unstructured obj 'spec:apDosPolicy': %w", err)
 	}
-	if has {
-		dosLog, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosLogConfGVK.Kind, log)
-		if err != nil {
-			glog.Warningf("error getting Dos log conf %v for Dos Protected Resource %v/%v: %v", dosLog, protectedRes.GetNamespace(), protectedRes.GetName(), err)
-		} else {
-			dosProtectedEx.DosLogConf = dosLog
+	if found {
+		if !strings.Contains(dosPolicyRef, "/") {
+			dosPolicyRef = fmt.Sprintf("%v/%v", parentNamespace, dosPolicyRef)
 		}
+
+		apDosPolicy, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosPolicyGVK.Kind, dosPolicyRef)
+		if err != nil {
+			return nil, fmt.Errorf("dos policy %v is invalid: %w", dosPolicyRef, err)
+		}
+		dosEx.DosPolicy = apDosPolicy
 	}
 
-	return dosProtectedEx
+	dosLogRef, found, err := unstructured.NestedString(dosProtected.Object, "spec", "dosSecurityLog", "apDosLogConf")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get field from unstructured obj 'spec:dosSecurityLog:apDosLogConf': %w", err)
+	}
+	if found {
+		logConfKey := dosLogRef
+		if !strings.Contains(logConfKey, "/") {
+			logConfKey = fmt.Sprintf("%v/%v", parentNamespace, logConfKey)
+		}
+
+		logConf, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosLogConfGVK.Kind, logConfKey)
+		if err != nil {
+			return nil, fmt.Errorf("dos logconf %v is invalid: %w", logConfKey, err)
+		}
+		dosEx.DosLogConf = logConf
+	}
+
+	return dosEx, nil
 }
+
+//func (lbc *LoadBalancerController) createDosResourceEx(protectedRes *unstructured.Unstructured) *configs.DosProtectedEx {
+//	dosProtectedEx := &configs.DosProtectedEx{
+//		DosProtected: protectedRes,
+//	}
+//
+//	pol, has, err := unstructured.NestedString(protectedRes.Object, "spec", "apDosPolicy")
+//	if err != nil {
+//		glog.Warningf("error getting Dos policy name %v for Dos Protected Resource %v/%v: %v", pol, protectedRes.GetNamespace(), protectedRes.GetName(), err)
+//	}
+//	if has {
+//		dosPol, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosPolicyGVK.Kind, pol)
+//		if err != nil {
+//			glog.Warningf("error getting Dos policy %v for Dos Protected Resource %v/%v: %v", pol, protectedRes.GetNamespace(), protectedRes.GetName(), err)
+//		} else {
+//			dosProtectedEx.DosPolicy = dosPol
+//		}
+//	}
+//
+//	log, has, err := unstructured.NestedString(protectedRes.Object, "spec", "dosSecurityLog", "apDosLogConf")
+//	if err != nil {
+//		glog.Warningf("error getting Dos log conf name %v for Dos Protected Resource %v/%v: %v", pol, protectedRes.GetNamespace(), protectedRes.GetName(), err)
+//	}
+//	if has {
+//		dosLog, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosLogConfGVK.Kind, log)
+//		if err != nil {
+//			glog.Warningf("error getting Dos log conf %v for Dos Protected Resource %v/%v: %v", dosLog, protectedRes.GetNamespace(), protectedRes.GetName(), err)
+//		} else {
+//			dosProtectedEx.DosLogConf = dosLog
+//		}
+//	}
+//
+//	return dosProtectedEx
+//}
 
 func (lbc *LoadBalancerController) createIngressEx(ing *networking.Ingress, validHosts map[string]bool, validMinionPaths map[string]bool) *configs.IngressEx {
 	ingEx := &configs.IngressEx{
@@ -2260,11 +2316,12 @@ func (lbc *LoadBalancerController) createIngressEx(ing *networking.Ingress, vali
 
 		if lbc.appProtectDosEnabled {
 			if dosProtectedAnnotationValue, exists := ingEx.Ingress.Annotations[configs.AppProtectDosProtectedAnnotation]; exists {
-				protected, err := lbc.getAppProtectDosProtectedResource(ing)
+				dosResEx, err := lbc.generateDosProtectedEx(ing.Namespace, dosProtectedAnnotationValue)
 				if err != nil {
 					glog.Warningf("Error Getting Dos Protected Resource %v for Ingress %v/%v: %v", dosProtectedAnnotationValue, ing.Namespace, ing.Name, err)
-				} else {
-					ingEx.AppProtectDosResourceEx = lbc.createAppProtectDosResourceEx(protected)
+				}
+				if dosResEx != nil {
+					ingEx.DosResourceEx = dosResEx
 				}
 			}
 		}
@@ -2418,15 +2475,15 @@ func (lbc *LoadBalancerController) getAppProtectPolicy(ing *networking.Ingress) 
 	return apPolicy, nil
 }
 
-func (lbc *LoadBalancerController) getAppProtectDosProtectedResource(ing *networking.Ingress) (*unstructured.Unstructured, error) {
-	nameNamespace := appprotect_common.ParseResourceReferenceAnnotation(ing.Namespace, ing.Annotations[configs.AppProtectDosProtectedAnnotation])
-	resource, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourceGVK.Kind, nameNamespace)
-	if err != nil {
-		return nil, fmt.Errorf("Error retrieving App Protect Dos Policy for Ingress %v: %w ", ing.Name, err)
-	}
-
-	return resource, nil
-}
+//func (lbc *LoadBalancerController) getAppProtectDosProtectedResource(ing *networking.Ingress) (*unstructured.Unstructured, error) {
+//	nameNamespace := appprotect_common.ParseResourceReferenceAnnotation(ing.Namespace, ing.Annotations[configs.AppProtectDosProtectedAnnotation])
+//	resource, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourceGVK.Kind, nameNamespace)
+//	if err != nil {
+//		return nil, fmt.Errorf("Error retrieving App Protect Dos Policy for Ingress %v: %w ", ing.Name, err)
+//	}
+//
+//	return resource, nil
+//}
 
 func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.VirtualServer, virtualServerRoutes []*conf_v1.VirtualServerRoute) *configs.VirtualServerEx {
 	virtualServerEx := configs.VirtualServerEx{
@@ -2434,8 +2491,7 @@ func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.
 		SecretRefs:     make(map[string]*secrets.SecretReference),
 		ApPolRefs:      make(map[string]*unstructured.Unstructured),
 		LogConfRefs:    make(map[string]*unstructured.Unstructured),
-		ApDosPolRefs:   make(map[string]*unstructured.Unstructured),
-		DosLogConfRefs: make(map[string]*unstructured.Unstructured),
+		DosProtectedEx: &configs.DosProtectedEx{},
 	}
 
 	if virtualServer.Spec.TLS != nil && virtualServer.Spec.TLS.Secret != "" {
@@ -2476,10 +2532,11 @@ func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.
 		glog.Warningf("Error getting App Protect resource for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 	}
 
-	err = lbc.addDosPolicyRefs(virtualServerEx.ApDosPolRefs, virtualServerEx.DosLogConfRefs, virtualServerEx.DosProtectedRefs, policies)
+	dosEx, err := lbc.generateDosProtectedEx(virtualServer.Namespace, virtualServer.Spec.Dos)
 	if err != nil {
 		glog.Warningf("Error getting App Protect Dos resource for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 	}
+	virtualServerEx.DosProtectedEx = dosEx
 
 	endpoints := make(map[string][]string)
 	externalNameSvcs := make(map[string]bool)
@@ -2553,10 +2610,11 @@ func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.
 			glog.Warningf("Error getting WAF policies for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 		}
 
-		err = lbc.addDosPolicyRefs(virtualServerEx.ApDosPolRefs, virtualServerEx.DosLogConfRefs, virtualServerEx.DosProtectedRefs, vsRoutePolicies)
+		dosEx, err = lbc.generateDosProtectedEx(virtualServer.Namespace, r.Dos)
 		if err != nil {
 			glog.Warningf("Error getting Dos policies for VirtualServer %v/%v: %v", virtualServer.Namespace, virtualServer.Name, err)
 		}
+		virtualServerEx.DosProtectedEx = dosEx //todo ?
 
 		err = lbc.addOIDCSecretRefs(virtualServerEx.SecretRefs, vsRoutePolicies)
 		if err != nil {
@@ -2592,10 +2650,10 @@ func (lbc *LoadBalancerController) createVirtualServerEx(virtualServer *conf_v1.
 				glog.Warningf("Error getting WAF policies for VirtualServerRoute %v/%v: %v", vsr.Namespace, vsr.Name, err)
 			}
 
-			err = lbc.addDosPolicyRefs(virtualServerEx.ApDosPolRefs, virtualServerEx.DosLogConfRefs, virtualServerEx.DosProtectedRefs, vsrSubroutePolicies)
-			if err != nil {
-				glog.Warningf("Error getting Dos policies for VirtualServerRoute %v/%v: %v", vsr.Namespace, vsr.Name, err)
-			}
+			//err = lbc.addDosPolicyRefs(virtualServerEx.ApDosPolRefs, virtualServerEx.DosLogConfRefs, virtualServerEx.DosProtectedRefs, vsrSubroutePolicies)
+			//if err != nil {
+			//	glog.Warningf("Error getting Dos policies for VirtualServerRoute %v/%v: %v", vsr.Namespace, vsr.Name, err)
+			//}
 		}
 
 		for _, u := range vsr.Spec.Upstreams {
@@ -2853,66 +2911,6 @@ func (lbc *LoadBalancerController) addWAFPolicyRefs(
 			logConf, err := lbc.appProtectConfiguration.GetAppResource(appprotect.LogConfGVK.Kind, logConfKey)
 			if err != nil {
 				return fmt.Errorf("WAF policy %q is invalid: %w", logConfKey, err)
-			}
-			logConfRef[logConfKey] = logConf
-		}
-
-	}
-	return nil
-}
-
-// addDosPolicyRefs ensures the app protect dos resources that are referenced in policies exist.
-func (lbc *LoadBalancerController) addDosPolicyRefs(
-	apDosPolRef, logConfRef, protectedRef map[string]*unstructured.Unstructured,
-	policies []*conf_v1.Policy,
-) error {
-	for _, pol := range policies {
-		if pol.Spec.Dos == "" {
-			continue
-		}
-
-		key := pol.Spec.Dos
-		if !strings.Contains(key, "/") {
-			key = fmt.Sprintf("%v/%v", pol.Namespace, key)
-		}
-
-		dosProtected, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosProtectedResourceGVK.Kind, key)
-		if err != nil {
-			return fmt.Errorf("Dos policy %v is invalid: %w", key, err)
-		}
-		protectedRef[key] = dosProtected
-
-		// the dos protected object can have a reference to a dos policy
-		dosPolicyRef, found, err := unstructured.NestedString(dosProtected.Object, "spec", "apDosPolicy")
-		if err != nil {
-			return fmt.Errorf("failed to get field from unstructured obj 'spec:apDosPolicy': %w", err)
-		}
-		if found {
-			if !strings.Contains(dosPolicyRef, "/") {
-				dosPolicyRef = fmt.Sprintf("%v/%v", pol.Namespace, dosPolicyRef)
-			}
-
-			apDosPolicy, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosPolicyGVK.Kind, dosPolicyRef)
-			if err != nil {
-				return fmt.Errorf("dos policy %v is invalid: %w", dosPolicyRef, err)
-			}
-			apDosPolRef[dosPolicyRef] = apDosPolicy
-		}
-
-		// the dos protected object can have a reference to a dos log conf
-		dosLogRef, found, err := unstructured.NestedString(dosProtected.Object, "spec", "dosSecurityLog", "apDosLogConf")
-		if err != nil {
-			return fmt.Errorf("failed to get field from unstructured obj 'spec:apDosPolicy': %w", err)
-		}
-		if found {
-			logConfKey := dosLogRef
-			if !strings.Contains(logConfKey, "/") {
-				logConfKey = fmt.Sprintf("%v/%v", pol.Namespace, logConfKey)
-			}
-
-			logConf, err := lbc.appProtectDosConfiguration.GetAppResource(appprotectdos.DosLogConfGVK.Kind, logConfKey)
-			if err != nil {
-				return fmt.Errorf("Dos policy %v is invalid: %w", logConfKey, err)
 			}
 			logConfRef[logConfKey] = logConf
 		}

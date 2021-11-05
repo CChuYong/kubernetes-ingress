@@ -102,7 +102,7 @@ type Server struct {
 	AppProtectDosEnable       string
 	AppProtectDosPolicyFile   string
 	AppProtectDosLogConfFile  string
-	AppProtectDosLogEnable    string
+	AppProtectDosLogEnable    bool
 	AppProtectDosMonitor      string
 	AppProtectDosName         string
 	AppProtectDosAccessLogDst string

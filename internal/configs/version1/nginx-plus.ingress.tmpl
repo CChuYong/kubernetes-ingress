@@ -78,7 +78,7 @@ server {
 	app_protect_dos_enable {{$server.AppProtectDosEnable}};
 	{{if $server.AppProtectDosPolicyFile}}app_protect_dos_policy_file {{$server.AppProtectDosPolicyFile}};{{end}}
 	{{- if $server.AppProtectDosLogEnable}}
-	app_protect_dos_security_log_enable {{$server.AppProtectDosLogEnable}};
+	app_protect_dos_security_log_enable on;
 	{{if $server.AppProtectDosLogConfFile}}app_protect_dos_security_log {{$server.AppProtectDosLogConfFile}};{{end}}
 	{{- end}}
 	{{- if $server.AppProtectDosAccessLogDst}}

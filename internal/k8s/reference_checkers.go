@@ -288,8 +288,11 @@ func (rc *dosResourceReferenceChecker) IsReferencedByMinion(namespace string, na
 }
 
 func (rc *dosResourceReferenceChecker) IsReferencedByVirtualServer(namespace string, name string, vs *v1.VirtualServer) bool {
-	for _, pols := range vs.Spec.Policies {
-		if pols.Name == name && pols.Namespace == namespace {
+	if vs.Spec.Dos == namespace+"/"+name || (namespace == vs.Namespace && vs.Spec.Dos == name) {
+		return true
+	}
+	for _, route := range vs.Spec.Routes {
+		if route.Dos == namespace+"/"+name || (namespace == vs.Namespace && route.Dos == name) {
 			return true
 		}
 	}
