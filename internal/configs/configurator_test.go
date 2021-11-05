@@ -1359,8 +1359,6 @@ func TestUpdateApDosResources(t *testing.T) {
 		},
 	}
 
-	//appProtectDosLogDst := "test-dst"
-
 	tests := []struct {
 		ingEx    *IngressEx
 		expected *appProtectDosResources
